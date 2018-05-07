@@ -1,13 +1,15 @@
 from __future__ import unicode_literals
 
+import asyncio
 import json
+import ssl
 
 try:
     import hcl
     has_hcl_parser = True
 except ImportError:
     has_hcl_parser = False
-import requests
+import aiohttp
 
 from hvac import exceptions
 
@@ -16,63 +18,79 @@ try:
 except ImportError:
     from urllib.parse import urljoin
 
-class Client(object):
-    def __init__(self, url='http://localhost:8200', token=None,
+loop = asyncio.get_event_loop()
+
+
+def async_to_sync(f):
+    def wrapper(*args, **kwargs):
+        if loop.is_running():
+            return f(*args, **kwargs)
+        coro = asyncio.coroutine(f)
+        future = coro(*args, **kwargs)
+        return loop.run_until_complete(future)
+    return wrapper
+
+
+class AsyncClient(object):
+    def __init__(self, url='http://127.0.0.1:8200', token=None,
                  cert=None, verify=True, timeout=30, proxies=None,
                  allow_redirects=True, session=None):
 
-        if not session:
-            session = requests.Session()
-
         self.allow_redirects = allow_redirects
-        self.session = session
+        self._session = session
         self.token = token
 
         self._url = url
         self._kwargs = {
-            'cert': cert,
-            'verify': verify,
             'timeout': timeout,
-            'proxies': proxies,
         }
+        self._verify = verify
+        self._cert =  cert
+        self._proxies = proxies
 
-    def read(self, path, wrap_ttl=None):
+    @property
+    def session(self):
+        if not self._session:
+            self._session = aiohttp.ClientSession()
+        return self._session
+
+    async def read(self, path, wrap_ttl=None):
         """
         GET /<path>
         """
         try:
-            return self._get('/v1/{0}'.format(path), wrap_ttl=wrap_ttl).json()
+            return await (await self._get('/v1/{0}'.format(path), wrap_ttl=wrap_ttl)).json()
         except exceptions.InvalidPath:
             return None
 
-    def list(self, path):
+    async def list(self, path):
         """
         GET /<path>?list=true
         """
         try:
             payload = {
-                'list': True
+                'list': 'True'
             }
-            return self._get('/v1/{0}'.format(path), params=payload).json()
+            return await (await self._get('/v1/{0}'.format(path), params=payload)).json()
         except exceptions.InvalidPath:
             return None
 
-    def write(self, path, wrap_ttl=None, **kwargs):
+    async def write(self, path, wrap_ttl=None, **kwargs):
         """
         PUT /<path>
         """
-        response = self._put('/v1/{0}'.format(path), json=kwargs, wrap_ttl=wrap_ttl)
+        response = await self._put('/v1/{0}'.format(path), json=kwargs, wrap_ttl=wrap_ttl)
 
-        if response.status_code == 200:
-            return response.json()
+        if response.status == 200:
+            return await response.json()
 
     def delete(self, path):
         """
         DELETE /<path>
         """
-        self._delete('/v1/{0}'.format(path))
+        return self._delete('/v1/{0}'.format(path))
 
-    def unwrap(self, token):
+    async def unwrap(self, token):
         """
         POST /sys/wrapping/unwrap
         X-Vault-Token: <token>
@@ -80,17 +98,17 @@ class Client(object):
         _token = self.token
         try:
             self.token = token
-            return self._post('/v1/sys/wrapping/unwrap').json()
+            return await (await self._post('/v1/sys/wrapping/unwrap')).json()
         finally:
             self.token = _token
 
-    def is_initialized(self):
+    async def is_initialized(self):
         """
         GET /sys/init
         """
-        return self._get('/v1/sys/init').json()['initialized']
+        return (await (await self._get('/v1/sys/init')).json())['initialized']
 
-    def initialize(self, secret_shares=5, secret_threshold=3, pgp_keys=None):
+    async def initialize(self, secret_shares=5, secret_threshold=3, pgp_keys=None):
         """
         PUT /sys/init
         """
@@ -104,66 +122,64 @@ class Client(object):
                 raise ValueError('Length of pgp_keys must equal secret shares')
 
             params['pgp_keys'] = pgp_keys
-
-        return self._put('/v1/sys/init', json=params).json()
+        return await (await self._put('/v1/sys/init', json=params)).json()
 
     @property
-    def seal_status(self):
+    async def seal_status(self):
         """
         GET /sys/seal-status
         """
-        return self._get('/v1/sys/seal-status').json()
+        return await (await self._get('/v1/sys/seal-status')).json()
 
-    def is_sealed(self):
-        return self.seal_status['sealed']
+    async def is_sealed(self):
+        return (await self.seal_status)['sealed']
 
     def seal(self):
         """
         PUT /sys/seal
         """
-        self._put('/v1/sys/seal')
+        return self._put('/v1/sys/seal')
 
-    def unseal(self, key):
+    async def unseal(self, key):
         """
         PUT /sys/unseal
         """
         params = {
             'key': key,
         }
+        return await (await self._put('/v1/sys/unseal', json=params)).json()
 
-        return self._put('/v1/sys/unseal', json=params).json()
-
-    def unseal_multi(self, keys):
+    async def unseal_multi(self, keys):
         result = None
 
         for key in keys:
-            result = self.unseal(key)
+            result = await self.unseal(key)
             if not result['sealed']:
                 break
 
         return result
 
     @property
-    def key_status(self):
+    async def key_status(self):
         """
         GET /sys/key-status
         """
-        return self._get('/v1/sys/key-status').json()
+        return await (await self._get('/v1/sys/key-status')).json()
 
     def rotate(self):
         """
         PUT /sys/rotate
         """
-        self._put('/v1/sys/rotate')
+        return self._put('/v1/sys/rotate')
 
     @property
-    def rekey_status(self):
+    async def rekey_status(self):
         """
         GET /sys/rekey/init
         """
-        return self._get('/v1/sys/rekey/init').json()
+        return await (await self._get('/v1/sys/rekey/init')).json()
 
-    def start_rekey(self, secret_shares=5, secret_threshold=3, pgp_keys=None,
+    async def start_rekey(self, secret_shares=5, secret_threshold=3, pgp_keys=None,
                     backup=False):
         """
         PUT /sys/rekey/init
@@ -180,17 +196,17 @@ class Client(object):
             params['pgp_keys'] = pgp_keys
             params['backup'] = backup
 
-        resp = self._put('/v1/sys/rekey/init', json=params)
+        resp = await self._put('/v1/sys/rekey/init', json=params)
         if resp.text:
-            return resp.json()
+            return await resp.json()
 
     def cancel_rekey(self):
         """
         DELETE /sys/rekey/init
         """
-        self._delete('/v1/sys/rekey/init')
+        return self._delete('/v1/sys/rekey/init')
 
-    def rekey(self, key, nonce=None):
+    async def rekey(self, key, nonce=None):
         """
         PUT /sys/rekey/update
         """
@@ -201,63 +217,63 @@ class Client(object):
         if nonce:
             params['nonce'] = nonce
 
-        return self._put('/v1/sys/rekey/update', json=params).json()
+        return await (await self._put('/v1/sys/rekey/update', json=params)).json()
 
-    def rekey_multi(self, keys, nonce=None):
+    async def rekey_multi(self, keys, nonce=None):
         result = None
 
         for key in keys:
-            result = self.rekey(key, nonce=nonce)
-            if result['complete']:
+            result = await self.rekey(key, nonce=nonce)
+            if 'complete' in result and result['complete']:
                 break
 
         return result
 
-    def get_backed_up_keys(self):
+    async def get_backed_up_keys(self):
         """
         GET /sys/rekey/backup
         """
-        return self._get('/v1/sys/rekey/backup').json()
+        return await (await self._get('/v1/sys/rekey/backup')).json()
 
     @property
-    def ha_status(self):
+    async def ha_status(self):
         """
         GET /sys/leader
         """
-        return self._get('/v1/sys/leader').json()
+        return await (await self._get('/v1/sys/leader')).json()
 
-    def renew_secret(self, lease_id, increment=None):
+    async def renew_secret(self, lease_id, increment=None):
         """
         PUT /sys/renew/<lease id>
         """
         params = {
             'increment': increment,
         }
-        return self._post('/v1/sys/renew/{0}'.format(lease_id), json=params).json()
+        return await (await self._post('/v1/sys/renew/{0}'.format(lease_id), json=params)).json()
 
     def revoke_secret(self, lease_id):
         """
         PUT /sys/revoke/<lease id>
         """
-        self._put('/v1/sys/revoke/{0}'.format(lease_id))
+        return self._put('/v1/sys/revoke/{0}'.format(lease_id))
 
     def revoke_secret_prefix(self, path_prefix):
         """
         PUT /sys/revoke-prefix/<path prefix>
         """
-        self._put('/v1/sys/revoke-prefix/{0}'.format(path_prefix))
+        return self._put('/v1/sys/revoke-prefix/{0}'.format(path_prefix))
 
     def revoke_self_token(self):
         """
         PUT /auth/token/revoke-self
         """
-        self._put('/v1/auth/token/revoke-self')
+        return self._put('/v1/auth/token/revoke-self')
 
-    def list_secret_backends(self):
+    async def list_secret_backends(self):
         """
         GET /sys/mounts
         """
-        return self._get('/v1/sys/mounts').json()
+        return await (await self._get('/v1/sys/mounts')).json()
 
     def enable_secret_backend(self, backend_type, description=None, mount_point=None, config=None):
         """
@@ -272,13 +288,13 @@ class Client(object):
             'config': config,
         }
 
-        self._post('/v1/sys/mounts/{0}'.format(mount_point), json=params)
+        return self._post('/v1/sys/mounts/{0}'.format(mount_point), json=params)
 
     def disable_secret_backend(self, mount_point):
         """
         DELETE /sys/mounts/<mount point>
         """
-        self._delete('/v1/sys/mounts/{0}'.format(mount_point))
+        return self._delete('/v1/sys/mounts/{0}'.format(mount_point))
 
     def remount_secret_backend(self, from_mount_point, to_mount_point):
         """
@@ -289,20 +305,20 @@ class Client(object):
             'to': to_mount_point,
         }
 
-        self._post('/v1/sys/remount', json=params)
+        return self._post('/v1/sys/remount', json=params)
 
-    def list_policies(self):
+    async def list_policies(self):
         """
         GET /sys/policy
         """
-        return self._get('/v1/sys/policy').json()['policies']
+        return (await (await self._get('/v1/sys/policy')).json())['policies']
 
-    def get_policy(self, name, parse=False):
+    async def get_policy(self, name, parse=False):
         """
         GET /sys/policy/<name>
         """
         try:
-            policy = self._get('/v1/sys/policy/{0}'.format(name)).json()['rules']
+            policy = (await (await self._get('/v1/sys/policy/{0}'.format(name))).json())['rules']
             if parse:
                 if not has_hcl_parser:
                     raise ImportError('pyhcl is required for policy parsing')
@@ -325,19 +341,19 @@ class Client(object):
             'rules': rules,
         }
 
-        self._put('/v1/sys/policy/{0}'.format(name), json=params)
+        return self._put('/v1/sys/policy/{0}'.format(name), json=params)
 
     def delete_policy(self, name):
         """
         DELETE /sys/policy/<name>
         """
-        self._delete('/v1/sys/policy/{0}'.format(name))
+        return self._delete('/v1/sys/policy/{0}'.format(name))
 
-    def list_audit_backends(self):
+    async def list_audit_backends(self):
         """
         GET /sys/audit
         """
-        return self._get('/v1/sys/audit').json()
+        return await (await self._get('/v1/sys/audit')).json()
 
     def enable_audit_backend(self, backend_type, description=None, options=None, name=None):
         """
@@ -352,24 +368,24 @@ class Client(object):
             'options': options,
         }
 
-        self._post('/v1/sys/audit/{0}'.format(name), json=params)
+        return self._post('/v1/sys/audit/{0}'.format(name), json=params)
 
     def disable_audit_backend(self, name):
         """
         DELETE /sys/audit/<name>
         """
-        self._delete('/v1/sys/audit/{0}'.format(name))
+        return self._delete('/v1/sys/audit/{0}'.format(name))
 
-    def audit_hash(self, name, input):
+    async def audit_hash(self, name, input):
         """
         POST /sys/audit-hash
         """
         params = {
             'input': input,
         }
-        return self._post('/v1/sys/audit-hash/{0}'.format(name), json=params).json()
+        return await (await self._post('/v1/sys/audit-hash/{0}'.format(name), json=params)).json()
 
-    def create_token(self, role=None, id=None, policies=None, meta=None,
+    async def create_token(self, role=None, id=None, policies=None, meta=None,
                      no_parent=False, lease=None, display_name=None,
                      num_uses=None, no_default_policy=False,
                      ttl=None, orphan=False, wrap_ttl=None, renewable=None,
@@ -400,13 +416,13 @@ class Client(object):
             params['explicit_max_ttl'] = explicit_max_ttl
 
         if orphan:
-            return self._post('/v1/auth/token/create-orphan', json=params, wrap_ttl=wrap_ttl).json()
+            return await (await self._post('/v1/auth/token/create-orphan', json=params, wrap_ttl=wrap_ttl)).json()
         elif role:
-            return self._post('/v1/auth/token/create/{0}'.format(role), json=params, wrap_ttl=wrap_ttl).json()
+            return await (await self._post('/v1/auth/token/create/{0}'.format(role), json=params, wrap_ttl=wrap_ttl)).json()
         else:
-            return self._post('/v1/auth/token/create', json=params, wrap_ttl=wrap_ttl).json()
+            return await (await self._post('/v1/auth/token/create', json=params, wrap_ttl=wrap_ttl)).json()
 
-    def lookup_token(self, token=None, accessor=False, wrap_ttl=None):
+    async def lookup_token(self, token=None, accessor=False, wrap_ttl=None):
         """
         GET /auth/token/lookup/<token>
         GET /auth/token/lookup-accessor/<token-accessor>
@@ -415,11 +431,11 @@ class Client(object):
         if token:
             if accessor:
                 path = '/v1/auth/token/lookup-accessor/{0}'.format(token)
-                return self._post(path, wrap_ttl=wrap_ttl).json()
+                return await (await self._post(path, wrap_ttl=wrap_ttl)).json()
             else:
-                return self._get('/v1/auth/token/lookup/{0}'.format(token)).json()
+                return await (await self._get('/v1/auth/token/lookup/{0}'.format(token))).json()
         else:
-            return self._get('/v1/auth/token/lookup-self', wrap_ttl=wrap_ttl).json()
+            return await (await self._get('/v1/auth/token/lookup-self', wrap_ttl=wrap_ttl)).json()
 
     def revoke_token(self, token, orphan=False, accessor=False):
         """
@@ -431,19 +447,19 @@ class Client(object):
             msg = "revoke_token does not support 'orphan' and 'accessor' flags together"
             raise exceptions.InvalidRequest(msg)
         elif accessor:
-            self._post('/v1/auth/token/revoke-accessor/{0}'.format(token))
+            return self._post('/v1/auth/token/revoke-accessor/{0}'.format(token))
         elif orphan:
-            self._post('/v1/auth/token/revoke-orphan/{0}'.format(token))
+            return self._post('/v1/auth/token/revoke-orphan/{0}'.format(token))
         else:
-            self._post('/v1/auth/token/revoke/{0}'.format(token))
+            return self._post('/v1/auth/token/revoke/{0}'.format(token))
 
-    def revoke_token_prefix(self, prefix):
+    async def revoke_token_prefix(self, prefix):
         """
         POST /auth/token/revoke-prefix/<prefix>
         """
-        self._post('/v1/auth/token/revoke-prefix/{0}'.format(prefix))
+        return self._post('/v1/auth/token/revoke-prefix/{0}'.format(prefix))
 
-    def renew_token(self, token=None, increment=None, wrap_ttl=None):
+    async def renew_token(self, token=None, increment=None, wrap_ttl=None):
         """
         POST /auth/token/renew/<token>
         POST /auth/token/renew-self
@@ -454,9 +470,9 @@ class Client(object):
 
         if token:
             path = '/v1/auth/token/renew/{0}'.format(token)
-            return self._post(path, json=params, wrap_ttl=wrap_ttl).json()
+            return await (await self._post(path, json=params, wrap_ttl=wrap_ttl)).json()
         else:
-            return self._post('/v1/auth/token/renew-self', json=params, wrap_ttl=wrap_ttl).json()
+            return await (await self._post('/v1/auth/token/renew-self', json=params, wrap_ttl=wrap_ttl)).json()
 
     def create_token_role(self, role,
                           allowed_policies=None, orphan=None, period=None,
@@ -492,17 +508,16 @@ class Client(object):
         """
         return self.list('auth/token/roles')
 
-
     def logout(self, revoke_token=False):
         """
         Clears the token used for authentication, optionally revoking it before doing so
         """
         if revoke_token:
-            self.revoke_self_token()
+            return self.revoke_self_token()
 
         self.token = None
 
-    def is_authenticated(self):
+    async def is_authenticated(self):
         """
         Helper method which returns the authentication status of the client
         """
@@ -510,7 +525,7 @@ class Client(object):
             return False
 
         try:
-            self.lookup_token()
+            await self.lookup_token()
             return True
         except exceptions.Forbidden:
             return False
@@ -607,12 +622,12 @@ class Client(object):
 
         return self._post('/v1/auth/{0}/map/app-id/{1}'.format(mount_point, app_id), json=params)
 
-    def get_app_id(self, app_id, mount_point='app-id', wrap_ttl=None):
+    async def get_app_id(self, app_id, mount_point='app-id', wrap_ttl=None):
         """
         GET /auth/<mount_point>/map/app-id/<app_id>
         """
         path = '/v1/auth/{0}/map/app-id/{1}'.format(mount_point, app_id)
-        return self._get(path, wrap_ttl=wrap_ttl).json()
+        return await (await self._get(path, wrap_ttl=wrap_ttl)).json()
 
     def delete_app_id(self, app_id, mount_point='app-id'):
         """
@@ -643,12 +658,12 @@ class Client(object):
 
         return self._post('/v1/auth/{0}/map/user-id/{1}'.format(mount_point, user_id), json=params)
 
-    def get_user_id(self, user_id, mount_point='app-id', wrap_ttl=None):
+    async def get_user_id(self, user_id, mount_point='app-id', wrap_ttl=None):
         """
         GET /auth/<mount_point>/map/user-id/<user_id>
         """
         path = '/v1/auth/{0}/map/user-id/{1}'.format(mount_point, user_id)
-        return self._get(path, wrap_ttl=wrap_ttl).json()
+        return await (await self._get(path, wrap_ttl=wrap_ttl)).json()
 
     def delete_user_id(self, user_id, mount_point='app-id'):
         """
@@ -669,11 +684,11 @@ class Client(object):
 
         return self._post('/v1/auth/aws-ec2/config/client', json=params)
 
-    def get_vault_ec2_client_configuration(self):
+    async def get_vault_ec2_client_configuration(self):
         """
         GET /auth/aws-ec2/config/client
         """
-        return self._get('/v1/auth/aws-ec2/config/client').json()
+        return await (await self._get('/v1/auth/aws-ec2/config/client')).json()
 
     def delete_vault_ec2_client_configuration(self):
         """
@@ -691,18 +706,18 @@ class Client(object):
         }
         return self._post('/v1/auth/aws-ec2/config/certificate/{0}'.format(cert_name), json=params)
 
-    def get_vault_ec2_certificate_configuration(self, cert_name):
+    async def get_vault_ec2_certificate_configuration(self, cert_name):
         """
         GET /auth/aws-ec2/config/certificate/<cert_name>
         """
-        return self._get('/v1/auth/aws-ec2/config/certificate/{0}'.format(cert_name)).json()
+        return await (await self._get('/v1/auth/aws-ec2/config/certificate/{0}'.format(cert_name))).json()
 
-    def list_vault_ec2_certificate_configurations(self):
+    async def list_vault_ec2_certificate_configurations(self):
         """
         GET /auth/aws-ec2/config/certificates?list=true
         """
         params = {'list': True}
-        return self._get('/v1/auth/aws-ec2/config/certificates', params=params).json()
+        return await (await self._get('/v1/auth/aws-ec2/config/certificates', params=params)).json()
 
     def create_ec2_role(self, role, bound_ami_id, role_tag=None, max_ttl=None, policies=None,
                           allow_instance_migration=False, disallow_reauthentication=False, **kwargs):
@@ -724,11 +739,11 @@ class Client(object):
         params.update(**kwargs)
         return self._post('/v1/auth/aws-ec2/role/{0}'.format(role), json=params)
 
-    def get_ec2_role(self, role):
+    async def get_ec2_role(self, role):
         """
         GET /auth/aws-ec2/role/<role>
         """
-        return self._get('/v1/auth/aws-ec2/role/{0}'.format(role)).json()
+        return await (await self._get('/v1/auth/aws-ec2/role/{0}'.format(role))).json()
 
     def delete_ec2_role(self, role):
         """
@@ -742,7 +757,7 @@ class Client(object):
         """
         return self._get('/v1/auth/aws-ec2/roles', params={'list': True})
 
-    def create_ec2_role_tag(self, role, policies=None, max_ttl=None, instance_id=None,
+    async def create_ec2_role_tag(self, role, policies=None, max_ttl=None, instance_id=None,
                             disallow_reauthentication=False, allow_instance_migration=False):
         """
         POST /auth/aws-ec2/role/<role>/tag
@@ -758,7 +773,7 @@ class Client(object):
             params['policies'] = policies
         if instance_id is not None:
             params['instance_id'] = instance_id
-        return self._post('/v1/auth/aws-ec2/role/{0}/tag'.format(role), json=params).json()
+        return await (await self._post('/v1/auth/aws-ec2/role/{0}/tag'.format(role), json=params)).json()
 
     def auth_ldap(self, username, password, mount_point='ldap', use_token=True, **kwargs):
         """
@@ -782,19 +797,18 @@ class Client(object):
 
         return self.auth('/v1/auth/{0}/login'.format(mount_point), json=params, use_token=use_token)
 
-    def auth(self, url, use_token=True, **kwargs):
-        response = self._post(url, **kwargs).json()
-
+    async def auth(self, url, use_token=True, **kwargs):
+        response = await (await self._post(url, **kwargs)).json()
         if use_token:
             self.token = response['auth']['client_token']
 
         return response
 
-    def list_auth_backends(self):
+    async def list_auth_backends(self):
         """
         GET /sys/auth
         """
-        return self._get('/v1/sys/auth').json()
+        return await (await self._get('/v1/sys/auth')).json()
 
     def enable_auth_backend(self, backend_type, description=None, mount_point=None):
         """
@@ -808,35 +822,35 @@ class Client(object):
             'description': description,
         }
 
-        self._post('/v1/sys/auth/{0}'.format(mount_point), json=params)
+        return self._post('/v1/sys/auth/{0}'.format(mount_point), json=params)
 
     def disable_auth_backend(self, mount_point):
         """
         DELETE /sys/auth/<mount point>
         """
-        self._delete('/v1/sys/auth/{0}'.format(mount_point))
+        return self._delete('/v1/sys/auth/{0}'.format(mount_point))
 
     def create_role(self, role_name, **kwargs):
         """
         POST /auth/approle/role/<role name>
         """
 
-        self._post('/v1/auth/approle/role/{0}'.format(role_name), json=kwargs)
+        return self._post('/v1/auth/approle/role/{0}'.format(role_name), json=kwargs)
 
-    def list_roles(self):
+    async def list_roles(self):
         """
         GET /auth/approle/role
         """
 
-        return self._get('/v1/auth/approle/role?list=true').json()
+        return await (await self._get('/v1/auth/approle/role?list=true')).json()
 
-    def get_role_id(self, role_name):
+    async def get_role_id(self, role_name):
         """
         GET /auth/approle/role/<role name>/role-id
         """
 
         url = '/v1/auth/approle/role/{0}/role-id'.format(role_name)
-        return self._get(url).json()['data']['role_id']
+        return (await (await self._get(url)).json())['data']['role_id']
 
     def set_role_id(self, role_name, role_id):
         """
@@ -847,16 +861,16 @@ class Client(object):
         params = {
             'role_id': role_id
         }
-        self._post(url, json=params)
+        return self._post(url, json=params)
 
 
-    def get_role(self, role_name):
+    async def get_role(self, role_name):
         """
         GET /auth/approle/role/<role name>
         """
-        return self._get('/v1/auth/approle/role/{0}'.format(role_name)).json()
+        return await (await self._get('/v1/auth/approle/role/{0}'.format(role_name))).json()
 
-    def create_role_secret_id(self, role_name, meta=None, wrap_ttl=None):
+    async def create_role_secret_id(self, role_name, meta=None, wrap_ttl=None):
         """
         POST /auth/approle/role/<role name>/secret-id
         """
@@ -866,9 +880,9 @@ class Client(object):
         if meta is not None:
             params['metadata'] = json.dumps(meta)
 
-        return self._post(url, json=params, wrap_ttl=wrap_ttl).json()
+        return await (await self._post(url, json=params, wrap_ttl=wrap_ttl)).json()
 
-    def get_role_secret_id(self, role_name, secret_id):
+    async def get_role_secret_id(self, role_name, secret_id):
         """
         POST /auth/approle/role/<role name>/secret-id/lookup
         """
@@ -876,21 +890,21 @@ class Client(object):
         params = {
             'secret_id': secret_id
         }
-        return self._post(url, json=params).json()
+        return await (await self._post(url, json=params)).json()
 
-    def list_role_secrets(self, role_name):
+    async def list_role_secrets(self, role_name):
         """
         GET /auth/approle/role/<role name>/secret-id?list=true
         """
         url = '/v1/auth/approle/role/{0}/secret-id?list=true'.format(role_name)
-        return self._get(url).json()
+        return await (await self._get(url)).json()
 
-    def get_role_secret_id_accessor(self, role_name, secret_id_accessor):
+    async def get_role_secret_id_accessor(self, role_name, secret_id_accessor):
         """
         GET /auth/approle/role/<role name>/secret-id-accessor/<secret_id_accessor>
         """
         url = '/v1/auth/approle/role/{0}/secret-id-accessor/{1}'.format(role_name, secret_id_accessor)
-        return self._get(url).json()
+        return await (await self._get(url)).json()
 
     def delete_role_secret_id(self, role_name, secret_id):
         """
@@ -900,16 +914,16 @@ class Client(object):
         params = {
             'secret_id': secret_id
         }
-        self._post(url, json=params)
+        return self._post(url, json=params)
 
     def delete_role_secret_id_accessor(self, role_name, secret_id_accessor):
         """
         DELETE /auth/approle/role/<role name>/secret-id/<secret_id_accessor>
         """
         url = '/v1/auth/approle/role/{0}/secret-id-accessor/{1}'.format(role_name, secret_id_accessor)
-        self._delete(url)
+        return self._delete(url)
 
-    def create_role_custom_secret_id(self, role_name, secret_id, meta=None):
+    async def create_role_custom_secret_id(self, role_name, secret_id, meta=None):
         """
         POST /auth/approle/role/<role name>/custom-secret-id
         """
@@ -919,7 +933,7 @@ class Client(object):
         }
         if meta is not None:
             params['meta'] = meta
-        return self._post(url, json=params).json()
+        return await (await self._post(url, json=params)).json()
 
     def auth_approle(self, role_id, secret_id=None, use_token=True):
         """
@@ -937,7 +951,7 @@ class Client(object):
         """
         Close the underlying Requests session
         """
-        self.session.close()
+        return self.session.close()
 
     def _get(self, url, **kwargs):
         return self.__request('get', url, **kwargs)
@@ -951,7 +965,7 @@ class Client(object):
     def _delete(self, url, **kwargs):
         return self.__request('delete', url, **kwargs)
 
-    def __request(self, method, url, headers=None, **kwargs):
+    async def __request(self, method, url, headers=None, **kwargs):
         url = urljoin(self._url, url)
 
         if not headers:
@@ -967,22 +981,24 @@ class Client(object):
         _kwargs = self._kwargs.copy()
         _kwargs.update(kwargs)
 
-        response = self.session.request(method, url, headers=headers,
-                                        allow_redirects=False, **_kwargs)
+        sslcontext = None
+        if self._verify and self._cert:
+            sslcontext = ssl.create_default_context(cafile=self._verify)
+            sslcontext.load_cert_chain(self._cert[0], self._cert[1])
 
-        # NOTE(ianunruh): workaround for https://github.com/ianunruh/hvac/issues/51
-        while response.is_redirect and self.allow_redirects:
-            url = urljoin(self._url, response.headers['Location'])
-            response = self.session.request(method, url, headers=headers,
-                                            allow_redirects=False, **_kwargs)
+        response = await self.session.request(
+            method, url, headers=headers,
+            allow_redirects=True,
+            ssl=sslcontext,
+            proxy=self._proxies, **_kwargs)
 
-        if response.status_code >= 400 and response.status_code < 600:
+        if response.status >= 400 and response.status < 600:
             text = errors = None
             if response.headers.get('Content-Type') == 'application/json':
-                errors = response.json().get('errors')
+                errors = (await response.json()).get('errors')
             if errors is None:
                 text = response.text
-            self.__raise_error(response.status_code, text, errors=errors)
+            self.__raise_error(response.status, text, errors=errors)
 
         return response
 
@@ -1005,3 +1021,43 @@ class Client(object):
             raise exceptions.VaultDown(message, errors=errors)
         else:
             raise exceptions.UnexpectedError(message)
+
+
+class Client(AsyncClient):
+
+    def __init__(self, url='http://127.0.0.1:8200', token=None,
+                 cert=None, verify=True, timeout=30, proxies=None,
+                 allow_redirects=True, session=None, sync=True):
+        super(Client, self).__init__(
+            url, token, cert, verify, timeout,
+            proxies, allow_redirects, session)
+        self._sync = sync
+        if sync:
+            for attr in AsyncClient.__dict__:
+                attr_obj = getattr(AsyncClient, attr)
+                if callable(attr_obj) and not attr.startswith('_'):
+                    setattr(self, attr, async_to_sync(getattr(self, attr)))
+
+    @property
+    def seal_status(self):
+        if not self._sync or loop.is_running():
+            return super(Client, self).seal_status
+        return loop.run_until_complete(super(Client, self).seal_status)
+
+    @property
+    def key_status(self):
+        if not self._sync or loop.is_running():
+            return super(Client, self).key_status
+        return loop.run_until_complete(super(Client, self).key_status)
+
+    @property
+    def rekey_status(self):
+        if not self._sync or loop.is_running():
+            return super(Client, self).rekey_status
+        return loop.run_until_complete(super(Client, self).rekey_status)
+
+    @property
+    def ha_status(self):
+        if not self._sync or loop.is_running():
+            return super(Client, self).ha_status
+        return loop.run_until_complete(super(Client, self).ha_status)
