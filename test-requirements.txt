@@ -1,5 +1,5 @@
 coverage
 nose
 tox
-
+asynctest
 semantic_version

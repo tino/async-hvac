@@ -1,21 +1,21 @@
-# HVAC
+# AHVAC
 
-[HashiCorp](https://hashicorp.com/) [Vault](https://www.vaultproject.io) API client for Python 2/3
+[HashiCorp](https://hashicorp.com/) [Vault](https://www.vaultproject.io) API asyncio client for Python 3
 
-[![Travis CI](https://travis-ci.org/ianunruh/hvac.svg?branch=master)](https://travis-ci.org/ianunruh/hvac) [![Latest Version](https://img.shields.io/pypi/v/hvac.svg)](https://pypi.python.org/pypi/hvac/)
+[![Travis CI](https://travis-ci.org/ianunruh/ahvac.svg?branch=master)](https://travis-ci.org/ianunruh/ahvac) [![Latest Version](https://img.shields.io/pypi/v/ahvac.svg)](https://pypi.python.org/pypi/ahvac/)
 
-Tested against Vault v0.1.2 and HEAD. Requires v0.1.2 or later.
+Tested against Vault v0.10.1 and HEAD. Requires v0.1.2 or later.
 
 ## Getting started
 
 ### Installation
 
 ```bash
-pip install hvac
+pip install ahvac
 ```
 or
 ```bash
-pip install hvac[parser]
+pip install ahvac[parser]
 ```
 if you would like to be able to return parsed HCL data as a Python dict for methods that support it.
 
@@ -42,11 +42,11 @@ client = hvac.Client(url='https://localhost:8200',
 ### Read and write to secret backends
 
 ```python
-client.write('secret/foo', baz='bar', lease='1h')
+await client.write('secret/foo', baz='bar', lease='1h')
 
-print(client.read('secret/foo'))
+print(await client.read('secret/foo'))
 
-client.delete('secret/foo')
+await client.delete('secret/foo')
 ```
 
 ### Authenticate to different auth backends

@@ -1,14 +1,12 @@
-import asyncio
 import re
 import subprocess
 import time
 
-from hvac import async_to_sync
 
 from semantic_version import Spec, Version
 
 
-class AsyncServerManager(object):
+class ServerManager(object):
     def __init__(self, config_path, client):
         self.config_path = config_path
         self.client = client
@@ -18,7 +16,7 @@ class AsyncServerManager(object):
 
         self._process = None
 
-    async def start(self):
+    def start(self):
         command = ['vault', 'server', '-config=' + self.config_path]
 
         self._process = subprocess.Popen(command,
@@ -29,47 +27,38 @@ class AsyncServerManager(object):
         last_exception = None
         while attempts_left > 0:
             try:
-                await self.client.is_initialized()
+                self.client.is_initialized()
                 return
             except Exception as ex:
                 print('Waiting for Vault to start')
 
-                time.sleep(2)
+                time.sleep(.5)
 
                 attempts_left -= 1
                 last_exception = ex
-        raise ex
+        raise last_exception
         # raise Exception('Unable to start Vault in background: {0}'.format(last_exception))
 
-    async def stop(self):
-        await self.client.close()
+    def stop(self):
+        self.client.close()
         self._process.kill()
 
-    async def initialize(self):
-        assert not (await self.client.is_initialized())
+    def initialize(self):
+        assert not self.client.is_initialized()
 
-        result = await self.client.initialize()
+        result = self.client.initialize()
 
-        assert (await self.client.is_initialized())
+        assert self.client.is_initialized()
 
         self.root_token = result['root_token']
         self.keys = result['keys']
 
-    async def unseal(self):
-        return await self.client.unseal_multi(self.keys)
-
-
-class ServerManager(AsyncServerManager):
-    def __init__(self, config_path, client, sync=True):
-        super(ServerManager, self).__init__(config_path, client)
-        if sync:
-            for attr in AsyncServerManager.__dict__:
-                attr_obj = getattr(AsyncServerManager, attr)
-                if callable(attr_obj) and not attr.startswith('_'):
-                    setattr(self, attr, async_to_sync(getattr(self, attr)))
+    def unseal(self):
+        return self.client.unseal_multi(self.keys)
 
 
 VERSION_REGEX = re.compile('Vault v([\d\.]+)')
+
 
 def match_version(spec):
     output = subprocess.check_output(['vault', 'version']).decode('ascii')
