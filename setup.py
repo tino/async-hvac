@@ -17,10 +17,11 @@ setup(
     name='async-hvac',
     version=open(vsn_path, 'r').read(),
     description='HashiCorp Vault API client',
+    long_description='HashiCorp Vault API python 3.6+ client using asyncio.',
     author='Lionel Zerbib',
     author_email='lionel@alooma.io',
     url='https://github.com/Aloomaio/async-hvac',
-    keywords=['hashicorp', 'vault'],
+    keywords=['hashicorp', 'vault', 'hvac'],
     classifiers=['License :: OSI Approved :: Apache Software License'],
     packages=find_packages(),
     install_requires=[
