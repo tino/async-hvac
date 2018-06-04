@@ -9,7 +9,7 @@ Tested against Vault v0.10.1 and HEAD. Requires v0.1.2 or later.
 ### Installation
 
 ```bash
-pip install ahvac
+pip install async-hvac
 ```
 or
 ```bash
@@ -22,19 +22,19 @@ if you would like to be able to return parsed HCL data as a Python dict for meth
 ```python
 import os
 
-import hvac
+import async_hvac
 
 # Using plaintext
-client = hvac.Client()
-client = hvac.Client(url='http://localhost:8200')
-client = hvac.Client(url='http://localhost:8200', token=os.environ['VAULT_TOKEN'])
+client = async_hvac.AsyncClient()
+client = async_hvac.AsyncClient(url='http://localhost:8200')
+client = async_hvac.AsyncClient(url='http://localhost:8200', token=os.environ['VAULT_TOKEN'])
 
 # Using TLS
-client = hvac.Client(url='https://localhost:8200')
+client = async_hvac.AsyncClient(url='https://localhost:8200')
 
 # Using TLS with client-side certificate authentication
-client = hvac.Client(url='https://localhost:8200',
-                     cert=('path/to/cert.pem', 'path/to/key.pem'))
+client = async_hvac.AsyncClient(url='https://localhost:8200',
+                                cert=('path/to/cert.pem', 'path/to/key.pem'))
 ```
 
 ### Read and write to secret backends
