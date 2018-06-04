@@ -1,5 +1,6 @@
 tox
 coverage
 nose
+asynctest
 semantic_version
 avakas

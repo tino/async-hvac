@@ -14,17 +14,17 @@ if not os.path.exists(vsn_path):
         sys.exit(1)
 
 setup(
-    name='hvac',
+    name='async-hvac',
     version=open(vsn_path, 'r').read(),
     description='HashiCorp Vault API client',
-    author='Ian Unruh',
-    author_email='ianunruh@gmail.com',
-    url='https://github.com/ianunruh/hvac',
+    author='Lionel Zerbib',
+    author_email='lionel@alooma.io',
+    url='https://github.com/Aloomaio/async-hvac',
     keywords=['hashicorp', 'vault'],
     classifiers=['License :: OSI Approved :: Apache Software License'],
     packages=find_packages(),
     install_requires=[
-        'requests>=2.7.0',
+        'aiohttp==3.2.0',
     ],
     include_package_data=True,
     package_data={'hvac':['version']},

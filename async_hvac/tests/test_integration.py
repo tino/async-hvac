@@ -1,16 +1,11 @@
 from unittest import TestCase, skipIf
 
-import hcl
-import requests
-from nose.tools import *
-from time import sleep
-
-from hvac import Client, exceptions
-from hvac.tests import util
+from async_hvac import Client, exceptions
+from async_hvac.tests import util
 
 
 def create_client(**kwargs):
-    return Client(url='https://localhost:8200',
+    return Client(url='https://127.0.0.1:8200',
                   cert=('test/client-cert.pem', 'test/client-key.pem'),
                   verify='test/server-cert.pem',
                   **kwargs)
@@ -34,6 +29,9 @@ class IntegrationTest(TestCase):
 
     def setUp(self):
         self.client = create_client(token=self.root_token())
+
+    def tearDown(self):
+        self.client.close()
 
     def test_unseal_multi(self):
         cls = type(self)
@@ -285,7 +283,8 @@ class IntegrationTest(TestCase):
 
         self.client.token = self.root_token()
         self.client.delete_userpass('testcreateuser')
-        assert_raises(exceptions.InvalidRequest, self.client.auth_userpass, 'testcreateuser', 'testcreateuserpass')
+        with self.assertRaises(exceptions.InvalidRequest):
+            self.client.auth_userpass('testcreateuser', 'testcreateuserpass')
 
     def test_app_id_auth(self):
         if 'app-id/' in self.client.list_auth_backends():
@@ -378,6 +377,7 @@ class IntegrationTest(TestCase):
         secret_id = create_result['data']['secret_id']
         result = self.client.get_role_secret_id('testrole', secret_id)
         assert result['data']['metadata']['foo'] == 'bar'
+        self.client.get_role_secret_id('testrole', secret_id)
         self.client.delete_role_secret_id('testrole', secret_id)
         try:
             self.client.get_role_secret_id('testrole', secret_id)
@@ -588,10 +588,12 @@ class IntegrationTest(TestCase):
     def test_missing_token(self):
         client = create_client()
         assert not client.is_authenticated()
+        client.close()
 
     def test_invalid_token(self):
         client = create_client(token='not-a-real-token')
         assert not client.is_authenticated()
+        client.close()
 
     def test_illegal_token(self):
         client = create_client(token='token-with-new-line\n')
@@ -599,6 +601,7 @@ class IntegrationTest(TestCase):
             client.is_authenticated()
         except ValueError as e:
             assert 'Invalid header value' in str(e)
+        client.close()
 
     def test_broken_token(self):
         client = create_client(token='\x1b')
@@ -606,6 +609,7 @@ class IntegrationTest(TestCase):
             client.is_authenticated()
         except exceptions.InvalidRequest as e:
             assert "invalid header value" in str(e)
+        client.close()
 
     def test_client_authenticated(self):
         assert self.client.is_authenticated()
@@ -782,7 +786,7 @@ class IntegrationTest(TestCase):
         assert not before
 
         # Create token role
-        assert self.client.create_token_role('testrole').status_code == 204
+        assert self.client.create_token_role('testrole').status == 204
 
         # List token roles
         during = self.client.list_token_roles()['data']['keys']
@@ -801,8 +805,8 @@ class IntegrationTest(TestCase):
         self.prep_policy('testpolicy')
 
         # Create token role w/ policy
-        assert self.client.create_token_role('testrole',
-                                             allowed_policies='testpolicy').status_code == 204
+        assert self.client.create_token_role(
+            'testrole', allowed_policies='testpolicy').status == 204
 
         # Create token against role
         token = self.client.create_token(lease='1h', role='testrole')
@@ -854,21 +858,21 @@ class IntegrationTest(TestCase):
         assert ('qux' in roles['data']['keys'])
 
         foo_role = self.client.get_ec2_role('foo')
-        assert (foo_role['data']['bound_ami_id'] == 'ami-notarealami')
+        assert (foo_role['data']['bound_ami_id'] == ['ami-notarealami'])
         assert ('ec2rolepolicy' in foo_role['data']['policies'])
 
         bar_role = self.client.get_ec2_role('bar')
-        assert (bar_role['data']['bound_account_id'] == '123456789012')
+        assert (bar_role['data']['bound_account_id'] == ['123456789012'])
         assert ('ec2rolepolicy' in bar_role['data']['policies'])
 
         baz_role = self.client.get_ec2_role('baz')
-        assert (baz_role['data']['bound_iam_role_arn'] == 'arn:aws:iam::123456789012:role/mockec2role')
+        assert (baz_role['data']['bound_iam_role_arn'] == ['arn:aws:iam::123456789012:role/mockec2role'])
         assert ('ec2rolepolicy' in baz_role['data']['policies'])
 
         qux_role = self.client.get_ec2_role('qux')
 
         assert (
-        qux_role['data']['bound_iam_instance_profile_arn'] == 'arn:aws:iam::123456789012:instance-profile/mockprofile')
+        qux_role['data']['bound_iam_instance_profile_arn'] == ['arn:aws:iam::123456789012:instance-profile/mockprofile'])
         assert ('ec2rolepolicy' in qux_role['data']['policies'])
 
         # teardown

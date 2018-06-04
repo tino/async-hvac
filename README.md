@@ -1,21 +1,19 @@
-# HVAC
+# ASYNC-HVAC
 
-[HashiCorp](https://hashicorp.com/) [Vault](https://www.vaultproject.io) API client for Python 2/3
+[HashiCorp](https://hashicorp.com/) [Vault](https://www.vaultproject.io) API asyncio client for Python 3
 
-[![Travis CI](https://travis-ci.org/ianunruh/hvac.svg?branch=master)](https://travis-ci.org/ianunruh/hvac) [![Latest Version](https://img.shields.io/pypi/v/hvac.svg)](https://pypi.python.org/pypi/hvac/)
-
-Tested against Vault v0.1.2 and HEAD. Requires v0.1.2 or later.
+Tested against Vault v0.10.1 and HEAD. Requires v0.1.2 or later.
 
 ## Getting started
 
 ### Installation
 
 ```bash
-pip install hvac
+pip install ahvac
 ```
 or
 ```bash
-pip install "hvac[parser]"
+pip install async-hvac[parser]
 ```
 if you would like to be able to return parsed HCL data as a Python dict for methods that support it.
 
@@ -42,11 +40,11 @@ client = hvac.Client(url='https://localhost:8200',
 ### Read and write to secret backends
 
 ```python
-client.write('secret/foo', baz='bar', lease='1h')
+await client.write('secret/foo', baz='bar', lease='1h')
 
-print(client.read('secret/foo'))
+print(await client.read('secret/foo'))
 
-client.delete('secret/foo')
+await client.delete('secret/foo')
 ```
 
 ### Authenticate to different auth backends
@@ -54,30 +52,30 @@ client.delete('secret/foo')
 ```python
 # Token
 client.token = 'MY_TOKEN'
-assert client.is_authenticated() # => True
+assert await client.is_authenticated() # => True
 
 # App ID
-client.auth_app_id('MY_APP_ID', 'MY_USER_ID')
+await client.auth_app_id('MY_APP_ID', 'MY_USER_ID')
 
 # App Role
-client.auth_approle('MY_ROLE_ID', 'MY_SECRET_ID')
+await client.auth_approle('MY_ROLE_ID', 'MY_SECRET_ID')
 
 # GitHub
-client.auth_github('MY_GITHUB_TOKEN')
+await client.auth_github('MY_GITHUB_TOKEN')
 
 # LDAP, Username & Password
-client.auth_ldap('MY_USERNAME', 'MY_PASSWORD')
-client.auth_userpass('MY_USERNAME', 'MY_PASSWORD')
+await client.auth_ldap('MY_USERNAME', 'MY_PASSWORD')
+await client.auth_userpass('MY_USERNAME', 'MY_PASSWORD')
 
 # TLS
 client = Client(cert=('path/to/cert.pem', 'path/to/key.pem'))
-client.auth_tls()
+await client.auth_tls()
 
 # Non-default mount point (available on all auth types)
-client.auth_userpass('MY_USERNAME', 'MY_PASSWORD', mount_point='CUSTOM_MOUNT_POINT')
+await client.auth_userpass('MY_USERNAME', 'MY_PASSWORD', mount_point='CUSTOM_MOUNT_POINT')
 
 # Authenticating without changing to new token (available on all auth types)
-result = client.auth_github('MY_GITHUB_TOKEN', use_token=False)
+result = await client.auth_github('MY_GITHUB_TOKEN', use_token=False)
 print(result['auth']['client_token']) # => u'NEW_TOKEN'
 
 # Custom or unsupported auth type
@@ -87,72 +85,72 @@ params = {
     'custom_param': 'MY_CUSTOM_PARAM',
 }
 
-result = client.auth('/v1/auth/CUSTOM_AUTH/login', json=params)
+result = await client.auth('/v1/auth/CUSTOM_AUTH/login', json=params)
 
 # Logout
-client.logout()
+await client.logout()
 ```
 
 ### Manage tokens
 
 ```python
-token = client.create_token(policies=['root'], lease='1h')
+token = await client.create_token(policies=['root'], lease='1h')
 
-current_token = client.lookup_token()
-some_other_token = client.lookup_token('xxx')
+current_token = await client.lookup_token()
+some_other_token = await client.lookup_token('xxx')
 
-client.revoke_token('xxx')
-client.revoke_token('yyy', orphan=True)
+await client.revoke_token('xxx')
+await client.revoke_token('yyy', orphan=True)
 
-client.revoke_token_prefix('zzz')
+await client.revoke_token_prefix('zzz')
 
-client.renew_token('aaa')
+await client.renew_token('aaa')
 ```
 
 ### Managing tokens using accessors
 
 ```python
-token = client.create_token(policies=['root'], lease='1h')
+token = await client.create_token(policies=['root'], lease='1h')
 token_accessor = token['auth']['accessor']
 
-same_token = client.lookup_token(token_accessor, accessor=True)
-client.revoke_token(token_accessor, accessor=True)
+same_token = await client.lookup_token(token_accessor, accessor=True)
+await client.revoke_token(token_accessor, accessor=True)
 ```
 
 ### Wrapping/unwrapping a token
 
 ```python
-wrap = client.create_token(policies=['root'], lease='1h', wrap_ttl='1m')
-result = self.client.unwrap(wrap['wrap_info']['token'])
+wrap = await client.create_token(policies=['root'], lease='1h', wrap_ttl='1m')
+result = await self.client.unwrap(wrap['wrap_info']['token'])
 ```
 
 ### Manipulate auth backends
 
 ```python
-backends = client.list_auth_backends()
+backends = await client.list_auth_backends()
 
-client.enable_auth_backend('userpass', mount_point='customuserpass')
-client.disable_auth_backend('github')
+await client.enable_auth_backend('userpass', mount_point='customuserpass')
+await client.disable_auth_backend('github')
 ```
 
 ### Manipulate secret backends
 
 ```python
-backends = client.list_secret_backends()
+backends = await client.list_secret_backends()
 
-client.enable_secret_backend('aws', mount_point='aws-us-east-1')
-client.disable_secret_backend('mysql')
+await client.enable_secret_backend('aws', mount_point='aws-us-east-1')
+await client.disable_secret_backend('mysql')
 
-client.tune_secret_backend('generic', mount_point='test', default_lease_ttl='3600s', max_lease_ttl='8600s')
-client.get_secret_backend_tuning('generic', mount_point='test')
+await client.tune_secret_backend('generic', mount_point='test', default_lease_ttl='3600s', max_lease_ttl='8600s')
+await client.get_secret_backend_tuning('generic', mount_point='test')
 
-client.remount_secret_backend('aws-us-east-1', 'aws-east')
+await client.remount_secret_backend('aws-us-east-1', 'aws-east')
 ```
 
 ### Manipulate policies
 
 ```python
-policies = client.list_policies() # => ['root']
+policies = await client.list_policies() # => ['root']
 
 policy = """
 path "sys" {
@@ -168,39 +166,39 @@ path "secret/foo" {
 }
 """
 
-client.set_policy('myapp', policy)
+await client.set_policy('myapp', policy)
 
-client.delete_policy('oldthing')
+await client.delete_policy('oldthing')
 
-policy = client.get_policy('mypolicy')
+policy = await client.get_policy('mypolicy')
 
 # Requires pyhcl to automatically parse HCL into a Python dictionary
-policy = client.get_policy('mypolicy', parse=True)
+policy = await client.get_policy('mypolicy', parse=True)
 ```
 
 ### Manipulate audit backends
 
 ```python
-backends = client.list_audit_backends()
+backends = await client.list_audit_backends()
 
 options = {
     'path': '/tmp/vault.log',
     'log_raw': True,
 }
 
-client.enable_audit_backend('file', options=options, name='somefile')
-client.disable_audit_backend('oldfile')
+await client.enable_audit_backend('file', options=options, name='somefile')
+await client.disable_audit_backend('oldfile')
 ```
 
 ### Initialize and seal/unseal
 
 ```python
-print(client.is_initialized()) # => False
+print(await client.is_initialized()) # => False
 
 shares = 5
 threshold = 3
 
-result = client.initialize(shares, threshold)
+result = await client.initialize(shares, threshold)
 
 root_token = result['root_token']
 keys = result['keys']
@@ -210,18 +208,18 @@ print(client.is_initialized()) # => True
 print(client.is_sealed()) # => True
 
 # unseal with individual keys
-client.unseal(keys[0])
-client.unseal(keys[1])
-client.unseal(keys[2])
+await client.unseal(keys[0])
+await client.unseal(keys[1])
+await client.unseal(keys[2])
 
 # unseal with multiple keys until threshold met
-client.unseal_multi(keys)
+await client.unseal_multi(keys)
 
-print(client.is_sealed()) # => False
+print(await client.is_sealed()) # => False
 
-client.seal()
+await client.seal()
 
-print(client.is_sealed()) # => True
+print(await client.is_sealed()) # => True
 ```
 
 ## Testing
