@@ -11,4 +11,6 @@
 /cover
 *~
 
-/hvac/version
+/hsync_hvac/version
+
+.idea

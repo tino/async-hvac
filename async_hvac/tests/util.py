@@ -2,7 +2,9 @@ import re
 import subprocess
 import time
 
+
 from semantic_version import Spec, Version
+
 
 class ServerManager(object):
     def __init__(self, config_path, client):
@@ -30,14 +32,15 @@ class ServerManager(object):
             except Exception as ex:
                 print('Waiting for Vault to start')
 
-                time.sleep(0.5)
+                time.sleep(.5)
 
                 attempts_left -= 1
                 last_exception = ex
-
-        raise Exception('Unable to start Vault in background: {0}'.format(last_exception))
+        raise last_exception
+        # raise Exception('Unable to start Vault in background: {0}'.format(last_exception))
 
     def stop(self):
+        self.client.close()
         self._process.kill()
 
     def initialize(self):
@@ -45,13 +48,17 @@ class ServerManager(object):
 
         result = self.client.initialize()
 
+        assert self.client.is_initialized()
+
         self.root_token = result['root_token']
         self.keys = result['keys']
 
     def unseal(self):
-        self.client.unseal_multi(self.keys)
+        return self.client.unseal_multi(self.keys)
+
 
 VERSION_REGEX = re.compile('Vault v([\d\.]+)')
+
 
 def match_version(spec):
     output = subprocess.check_output(['vault', 'version']).decode('ascii')
