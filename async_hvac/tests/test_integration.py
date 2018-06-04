@@ -163,8 +163,8 @@ class IntegrationTest(TestCase):
         path "sys" {
             policy = "deny"
         }
-            path "secret" {
-        policy = "write"
+        path "secret" {
+            policy = "write"
         }
         """
         obj = {
@@ -377,13 +377,8 @@ class IntegrationTest(TestCase):
         secret_id = create_result['data']['secret_id']
         result = self.client.get_role_secret_id('testrole', secret_id)
         assert result['data']['metadata']['foo'] == 'bar'
-        self.client.get_role_secret_id('testrole', secret_id)
         self.client.delete_role_secret_id('testrole', secret_id)
-        try:
-            self.client.get_role_secret_id('testrole', secret_id)
-            assert False
-        except (exceptions.InvalidPath, ValueError):
-            assert True
+        assert self.client.get_role_secret_id('testrole', secret_id) is None
         self.client.token = self.root_token()
         self.client.disable_auth_backend('approle')
 

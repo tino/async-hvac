@@ -322,7 +322,7 @@ class AsyncClient(object):
             'max_lease_ttl': max_lease_ttl
         }
 
-        self._post('/v1/sys/mounts/{0}/tune'.format(mount_point), json=params)
+        return self._post('/v1/sys/mounts/{0}/tune'.format(mount_point), json=params)
 
     async def get_secret_backend_tuning(self, backend_type, mount_point=None):
         """
