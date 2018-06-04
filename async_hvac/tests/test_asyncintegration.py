@@ -17,14 +17,6 @@ def create_client(sync=False, **kwargs):
                   **kwargs)
 
 
-def async_test(f):
-    def wrapper(*args, **kwargs):
-        coro = asyncio.coroutine(f)
-        future = coro(*args, **kwargs)
-        loop.run_until_complete(future)
-    return wrapper
-
-
 class IntegrationTest(TestCase):
 
     @classmethod

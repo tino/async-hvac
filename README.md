@@ -9,7 +9,7 @@ Tested against Vault v0.10.1 and HEAD. Requires v0.1.2 or later.
 ### Installation
 
 ```bash
-pip install ahvac
+pip install async-hvac
 ```
 or
 ```bash
