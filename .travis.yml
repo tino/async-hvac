@@ -19,9 +19,8 @@ script:
 - make clean distclean test package
 deploy:
   provider: script
-  script:
-   - make package
-   - twine upload --username $PYPI_USERNAME --password $PYPI_PASSWORD --skip-existing dist/*
+  skip_cleanup: true
+  script: twine upload --username $PYPI_USERNAME --password $PYPI_PASSWORD --skip-existing dist/*
   on:
     tags: true
     repo: Aloomaio/async-hvac
