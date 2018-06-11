@@ -13,19 +13,15 @@ matrix:
 install:
 - scripts/install-vault-${VAULT_BRANCH}.sh
 - pip install tox
-- echo [distutils]                                  > ~/.pypirc
-- echo index-servers =                             >> ~/.pypirc
-- echo "  pypi"                                    >> ~/.pypirc
-- echo [pypi]                                      >> ~/.pypirc
-- echo username=$PYPI_USERNAME                     >> ~/.pypirc
-- echo password=$PYPI_PASSWORD                     >> ~/.pypirc
-- chmod 600 ~/.pypirc
+- pip install twine
 script:
 - export PATH=$HOME/bin:$PATH
-- if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then make package ; else make test ; fi
+- make clean distclean test package
 deploy:
   provider: script
-  script: python setup.py sdist upload -r pypi
+  script:
+   - make package
+   - twine upload --username $PYPI_USERNAME --password $PYPI_PASSWORD --skip-existing dist/*
   on:
     tags: true
     repo: Aloomaio/async-hvac
