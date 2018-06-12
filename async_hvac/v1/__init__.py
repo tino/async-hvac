@@ -42,9 +42,7 @@ class AsyncClient(object):
         self.token = token
 
         self._url = url
-        self._kwargs = {
-            'timeout': timeout,
-        }
+        self._timeout = timeout
         self._verify = verify
         self._cert = cert
         self._proxies = proxies
@@ -57,7 +55,10 @@ class AsyncClient(object):
     @property
     def session(self):
         if not self._session:
-            self._session = aiohttp.ClientSession(loop=self._loop)
+            self._session = aiohttp.ClientSession(
+                loop=self._loop,
+                timeout=aiohttp.ClientTimeout(total=self._timeout)
+            )
         return self._session
 
     async def read(self, path, wrap_ttl=None):
@@ -1280,14 +1281,11 @@ class AsyncClient(object):
         if wrap_ttl:
             headers['X-Vault-Wrap-TTL'] = str(wrap_ttl)
 
-        _kwargs = self._kwargs.copy()
-        _kwargs.update(kwargs)
-
         response = await self.session.request(
             method, url, headers=headers,
             allow_redirects=True,
             ssl=self._sslcontext,
-            proxy=self._proxies, **_kwargs)
+            proxy=self._proxies, **kwargs)
 
         if response.status >= 400 and response.status < 600:
             text = errors = None
