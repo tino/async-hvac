@@ -4,3 +4,6 @@ nose
 asynctest
 semantic_version
 avakas
+requests-mock
+aioresponses
+mock
