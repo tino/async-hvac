@@ -6,6 +6,8 @@ matrix:
   - python: '3.6'
     env: TOXENV=py36 VAULT_BRANCH=release RELEASE=yes
   - python: '3.6'
+    env: TOXENV=py36-flake8 VAULT_BRANCH=release RELEASE=yes
+  - python: '3.6'
     env: TOXENV=py36 VAULT_BRANCH=head
   allow_failures:
   - python: '3.6'
