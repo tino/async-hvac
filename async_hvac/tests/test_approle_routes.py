@@ -9,6 +9,8 @@ from async_hvac.tests.util import RequestsMocker
 class TestApproleRoutes(TestCase):
     """Unit tests providing coverage for approle auth backend-related methods/routes."""
 
+
+
     @parameterized.expand([
         ("default mount point", None, "application1"),
         ("custom mount point", "my-approle-path", "application2"),
@@ -40,6 +42,7 @@ class TestApproleRoutes(TestCase):
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1"),
@@ -81,6 +84,7 @@ class TestApproleRoutes(TestCase):
 
         # ensure we received our mock response data back successfully
         self.assertEqual(mock_response, actual_response)
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "40b3c82d-12a6-838c-9e74-1f1133867e06"),
@@ -127,6 +131,7 @@ class TestApproleRoutes(TestCase):
             first=role_id,
             second=actual_response
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "custom-role-id-1"),
@@ -157,10 +162,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1"),
@@ -212,10 +218,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1"),
@@ -259,10 +266,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -314,10 +322,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -362,10 +371,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -417,10 +427,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -452,10 +463,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -488,10 +500,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "application1", "be78e3ca-f644-b099-3291-e8a6f5985cfe"),
@@ -536,10 +549,11 @@ class TestApproleRoutes(TestCase):
                 mount_point=mount_point,
             )
 
-        self.assertEquals(
+        self.assertEqual(
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, "c7f93182-c6b1-4b6a-9dfb-03bdb6df0026", "26089502-b7d3-412a-b3e6-3d44300f9bd1"),
@@ -595,3 +609,4 @@ class TestApproleRoutes(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()

@@ -7,3 +7,4 @@ avakas
 requests-mock
 aioresponses
 mock
+parameterized

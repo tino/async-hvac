@@ -97,7 +97,6 @@ def match_version(spec):
 class RequestsMocker(aioresponses):
 
     def __init__(self):
-        self.request_history = []
         super(RequestsMocker, self).__init__()
 
     def register_uri(self, method='GET', url='', status_code=200, json=None):
@@ -111,4 +110,3 @@ class RequestsMocker(aioresponses):
             req = self.post(url=url, status=status_code, body=json)
         if method == 'DELETE':
             req = self.delete(url=url, status=status_code, body=json)
-        self.request_history.append(req)

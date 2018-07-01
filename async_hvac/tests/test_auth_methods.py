@@ -30,7 +30,8 @@ class TestAuthMethods(TestCase):
             second=actual_response.status,
         )
 
-        actual_request_params = requests_mocker.request_history[0].json()
+        actual_request_params = requests_mocker.requests[
+            ('post', 'http://127.0.0.1:8200/v1/sys/auth/{0}/tune'.format(test_mount_point))][0].kwargs['json']
 
         # Ensure we sent through an optional tune parameter as expected
         self.assertEqual(
