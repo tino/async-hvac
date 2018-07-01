@@ -9,34 +9,12 @@ import json as json_util
 
 from semantic_version import Spec, Version
 
-from async_hvac import AsyncClient
-
-
-def async_to_sync(self, f):
-    def wrapper(*args, **kwargs):
-        if self._loop.is_running():
-            return f(*args, **kwargs)
-        coro = asyncio.coroutine(f)
-        future = coro(*args, **kwargs)
-        return self._executor.submit(
-            self._loop.run_until_complete,
-            future).result()
-    return wrapper
-
 
 class ServerManager(object):
-    def __init__(self, config_path, client, loop=None):
+
+    def __init__(self, config_path, client):
         self.config_path = config_path
         self.client = client
-        for attr in AsyncClient.__dict__:
-            attr_obj = getattr(AsyncClient, attr)
-            if callable(attr_obj) and not attr.startswith('_'):
-                setattr(client, attr, async_to_sync(client, getattr(client, attr)))
-        client._executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
-        if loop:
-            client._loop = loop
-        else:
-            client._loop = asyncio.new_event_loop()
         self.keys = None
         self.root_token = None
 

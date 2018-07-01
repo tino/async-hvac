@@ -93,10 +93,19 @@ class AsyncClient(object):
         X-Vault-Token: <token>
         """
         if token:
-            payload = {
-                'token': token
-            }
-            return await (await self._post('/v1/sys/wrapping/unwrap', json=payload)).json()
+            try:
+                path = "cubbyhole/response"
+                _token = self.token
+                try:
+                    self.token = token
+                    return json.loads((await self.read(path))['data']['response'])
+                finally:
+                    self.token = _token
+            except exceptions.Forbidden:
+                payload = {
+                    'token': token
+                }
+                return await (await self._post('/v1/sys/wrapping/unwrap', json=payload)).json()
         else:
             return await (await self._post('/v1/sys/wrapping/unwrap')).json()
 
@@ -155,6 +164,7 @@ class AsyncClient(object):
         params = {
             'key': key,
         }
+
         return await (await self._put('/v1/sys/unseal', json=params)).json()
 
     async def unseal_multi(self, keys):
@@ -650,7 +660,6 @@ class AsyncClient(object):
 
         return self.auth('/v1/auth/{0}/login/{1}'.format(mount_point, username), json=params, use_token=use_token)
 
-    # TODO....
     async def auth_aws_iam(self, access_key, secret_key, session_token=None, header_value=None, mount_point='aws', role='', use_token=True):
         """
         POST /auth/<mount point>/login
@@ -1487,7 +1496,6 @@ class AsyncClient(object):
         wrap_ttl = kwargs.pop('wrap_ttl', None)
         if wrap_ttl:
             headers['X-Vault-Wrap-TTL'] = str(wrap_ttl)
-
         response = await self.session.request(
             method, url, headers=headers,
             allow_redirects=False,

@@ -5,18 +5,25 @@ import sys
 from base64 import b64decode
 from uuid import UUID
 
-from async_hvac import AsyncClient, exceptions
+from async_hvac import AsyncClient, Client, exceptions
 from async_hvac.tests import util
 
 loop = asyncio.get_event_loop()
 
 
-def create_client(**kwargs):
-    return AsyncClient(url='https://127.0.0.1:8200',
-                       cert=('test/client-cert.pem', 'test/client-key.pem'),
-                       verify='test/server-cert.pem',
-                       loop=IntegrationTest.loop,
-                       **kwargs)
+def create_client(sync=False, **kwargs):
+    if sync:
+        return Client(url='https://127.0.0.1:8200',
+                      cert=('test/client-cert.pem', 'test/client-key.pem'),
+                      verify='test/server-cert.pem',
+                      loop=IntegrationTest.loop,
+                      **kwargs)
+    else:
+        return AsyncClient(url='https://127.0.0.1:8200',
+                           cert=('test/client-cert.pem', 'test/client-key.pem'),
+                           verify='test/server-cert.pem',
+                           loop=IntegrationTest.loop,
+                           **kwargs)
 
 
 class IntegrationTest(asynctest.TestCase):
@@ -25,8 +32,7 @@ class IntegrationTest(asynctest.TestCase):
     def setUpClass(cls):
         cls.manager = util.ServerManager(
             config_path='test/vault-tls.hcl',
-            client=create_client(),
-            loop=IntegrationTest.loop)
+            client=create_client(sync=True))
         cls.manager.start()
         cls.manager.initialize()
         cls.manager.unseal()
