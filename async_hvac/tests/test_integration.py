@@ -45,6 +45,12 @@ class IntegrationTest(asynctest.TestCase):
     async def tearDown(self):
         await self.client.close()
 
+    async def test_verifiy_false(self):
+        await self.client.close()
+        self.client = AsyncClient(
+            url='https://127.0.0.1:8200', verify=False, loop=IntegrationTest.loop)
+        assert 'ha_enabled' in (await self.client.ha_status)
+
     async def test_unseal_multi(self):
         cls = type(self)
 

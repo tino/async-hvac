@@ -32,14 +32,15 @@ class AsyncClient(object):
 
         self._url = url
         self._timeout = timeout
-        self._verify = verify
         self._cert = cert
         self._proxies = proxies
         self._loop = loop
         self._sslcontext = None
-        if self._verify and self._cert:
-            self._sslcontext = ssl.create_default_context(cafile=self._verify)
+        if verify and self._cert:
+            self._sslcontext = ssl.create_default_context(cafile=verify)
             self._sslcontext.load_cert_chain(self._cert[0], self._cert[1])
+        else:
+            self._sslcontext = False
 
     @property
     def session(self):
