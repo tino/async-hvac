@@ -1284,6 +1284,7 @@ class AsyncClient(object):
         response = await self.session.request(
             method, url, headers=headers,
             allow_redirects=True,
+            verify_ssl=self._verify,
             ssl=self._sslcontext,
             proxy=self._proxies, **kwargs)
 
