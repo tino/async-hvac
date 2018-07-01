@@ -510,7 +510,7 @@ class IntegrationTest(asynctest.TestCase):
         await self.client.enable_auth_backend('approle')
 
         await self.client.create_role('testrole')
-        create_result = await self.client.create_role_secret_id('testrole', {'foo':'bar'})
+        create_result = await self.client.create_role_secret_id('testrole', {'foo': 'bar'})
         secret_id = create_result['data']['secret_id']
         result = await self.client.get_role_secret_id('testrole', secret_id)
         assert result['data']['metadata']['foo'] == 'bar'
@@ -541,7 +541,7 @@ class IntegrationTest(asynctest.TestCase):
         await self.client.enable_auth_backend('approle')
 
         await self.client.create_role('testrole')
-        create_result = await self.client.create_role_secret_id('testrole', {'foo':'bar'})
+        create_result = await self.client.create_role_secret_id('testrole', {'foo': 'bar'})
         secret_id = create_result['data']['secret_id']
         role_id = await self.client.get_role_id('testrole')
         result = await self.client.auth_approle(role_id, secret_id, use_token=False)
@@ -758,7 +758,7 @@ class IntegrationTest(asynctest.TestCase):
 
         await self.client.write('auth/userpass/users/testuser', password='testpass', policies='not_root')
 
-        result = await self.client.auth_userpass('testuser', 'testpass')
+        await self.client.auth_userpass('testuser', 'testpass')
 
         await self.client.revoke_self_token()
         assert not (await self.client.is_authenticated())

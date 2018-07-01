@@ -83,7 +83,6 @@ class ServerManager(object):
         return self.client.unseal_multi(self.keys)
 
 
-
 VERSION_REGEX = re.compile('Vault v([\d\.]+)')
 
 
@@ -105,8 +104,8 @@ class RequestsMocker(aioresponses):
         else:
             json = ''
         if method == 'GET':
-            req = self.get(url=url, status=status_code, body=json)
+            self.get(url=url, status=status_code, body=json)
         if method == 'POST':
-            req = self.post(url=url, status=status_code, body=json)
+            self.post(url=url, status=status_code, body=json)
         if method == 'DELETE':
-            req = self.delete(url=url, status=status_code, body=json)
+            self.delete(url=url, status=status_code, body=json)

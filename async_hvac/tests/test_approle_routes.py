@@ -9,8 +9,6 @@ from async_hvac.tests.util import RequestsMocker
 class TestApproleRoutes(TestCase):
     """Unit tests providing coverage for approle auth backend-related methods/routes."""
 
-
-
     @parameterized.expand([
         ("default mount point", None, "application1"),
         ("custom mount point", "my-approle-path", "application2"),

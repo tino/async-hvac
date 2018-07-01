@@ -886,7 +886,7 @@ class AsyncClient(object):
                         bound_iam_instance_profile_arn=None, bound_ec2_instance_id=None, bound_region=None,
                         bound_vpc_id=None, bound_subnet_id=None, role_tag=None,  ttl=None, max_ttl=None, period=None,
                         policies=None, allow_instance_migration=False, disallow_reauthentication=False,
-                       resolve_aws_unique_ids=None, mount_point='aws-ec2'):
+                        resolve_aws_unique_ids=None, mount_point='aws-ec2'):
         """
         POST /auth/<mount_point>/role/<role>
         """
@@ -1286,7 +1286,7 @@ class AsyncClient(object):
         return await (await self._get(url)).json()
 
     async def transit_encrypt_data(self, name, plaintext, context=None, key_version=None, nonce=None, batch_input=None,
-                             key_type=None, convergent_encryption=None, mount_point='transit'):
+                                   key_type=None, convergent_encryption=None, mount_point='transit'):
         """
         POST /<mount_point>/encrypt/<name>
         """
@@ -1327,7 +1327,7 @@ class AsyncClient(object):
         return await (await self._post(url, json=params)).json()
 
     async def transit_rewrap_data(self, name, ciphertext, context=None, key_version=None, nonce=None, batch_input=None,
-                            mount_point='transit'):
+                                  mount_point='transit'):
         """
         POST /<mount_point>/rewrap/<name>
         """
@@ -1410,7 +1410,7 @@ class AsyncClient(object):
         return await (await self._post(url, json=params)).json()
 
     async def transit_sign_data(self, name, input_data, key_version=None, algorithm=None, context=None, prehashed=None,
-                          mount_point='transit', signature_algorithm='pss'):
+                                mount_point='transit', signature_algorithm='pss'):
         """
         POST /<mount_point>/sign/<name>(/<algorithm>)
         """
@@ -1433,7 +1433,7 @@ class AsyncClient(object):
         return await (await self._post(url, json=params)).json()
 
     async def transit_verify_signed_data(self, name, input_data, algorithm=None, signature=None, hmac=None, context=None,
-                                   prehashed=None, mount_point='transit', signature_algorithm='pss'):
+                                         prehashed=None, mount_point='transit', signature_algorithm='pss'):
         """
         POST /<mount_point>/verify/<name>(/<algorithm>)
         """
