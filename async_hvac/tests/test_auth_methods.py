@@ -38,6 +38,7 @@ class TestAuthMethods(TestCase):
             first=test_description,
             second=actual_request_params['description'],
         )
+        await client.close()
 
     @RequestsMocker()
     async def test_get_auth_backend_tuning(self, requests_mocker):
@@ -77,3 +78,4 @@ class TestAuthMethods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()

@@ -15,11 +15,6 @@ import aiohttp
 from async_hvac import aws_utils
 from async_hvac import exceptions
 
-try:
-    from urlparse import urljoin
-except ImportError:
-    from urllib.parse import urljoin
-
 
 class AsyncClient(object):
     def __init__(self, url='http://127.0.0.1:8200', token=None,
@@ -93,19 +88,10 @@ class AsyncClient(object):
         X-Vault-Token: <token>
         """
         if token:
-            try:
-                path = "cubbyhole/response"
-                _token = self.token
-                try:
-                    self.token = token
-                    return json.loads((await self.read(path))['data']['response'])
-                finally:
-                    self.token = _token
-            except exceptions.Forbidden:
-                payload = {
-                    'token': token
-                }
-                return await (await self._post('/v1/sys/wrapping/unwrap', json=payload)).json()
+            payload = {
+                'token': token
+            }
+            return await (await self._post('/v1/sys/wrapping/unwrap', json=payload)).json()
         else:
             return await (await self._post('/v1/sys/wrapping/unwrap')).json()
 
@@ -708,6 +694,24 @@ class AsyncClient(object):
 
         return self.auth('/v1/auth/{0}/login'.format(mount_point), json=params, use_token=use_token)
 
+    def auth_gcp(self, role, jwt, mount_point='gcp', use_token=True):
+        """
+        POST /auth/<mount point>/login
+        :param role: str, identifier for the GCP auth backend role being requested
+        :param jwt: str, JSON Web Token from the GCP metadata service
+        :param mount_point: str, The "path" the GCP auth backend was mounted on. Vault currently defaults to "gcp".
+        :param use_token: bool, if True, uses the token in the response received from the auth request to set the "token"
+        attribute on the current Client class instance.
+        :return: dict, parsed JSON response from the auth POST request
+        """
+
+        params = {
+            'role': role,
+            'jwt': jwt
+        }
+
+        return self.auth('/v1/auth/{0}/login'.format(mount_point), json=params, use_token=use_token)
+
     def create_userpass(self, username, password, policies, mount_point='userpass', **kwargs):
         """
         POST /auth/<mount point>/users/<username>
@@ -1222,6 +1226,124 @@ class AsyncClient(object):
 
         return self.auth('/v1/auth/{0}/login'.format(mount_point), json=params, use_token=use_token)
 
+    def create_kubernetes_configuration(self, kubernetes_host, kubernetes_ca_cert=None, token_reviewer_jwt=None, pem_keys=None, mount_point='kubernetes'):
+        """
+        POST /auth/<mount_point>/config
+        :param kubernetes_host: str, a host:port pair, or a URL to the base of the Kubernetes API server.
+        :param kubernetes_ca_cert: str, PEM encoded CA cert for use by the TLS client used to talk with the Kubernetes API.
+        :param token_reviewer_jwt: str, A service account JWT used to access the TokenReview API to validate other
+        JWTs during login. If not set the JWT used for login will be used to access the API.
+        :param pem_keys: list, Optional list of PEM-formated public keys or certificates used to verify the signatures of
+        Kubernetes service account JWTs. If a certificate is given, its public key will be extracted. Not every
+        installation of Kubernetes exposes these keys.
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: requests.Response, will be an empty body with a 204 status code upon success
+        """
+        params = {
+            'kubernetes_host': kubernetes_host,
+            'kubernetes_ca_cert': kubernetes_ca_cert,
+        }
+
+        if token_reviewer_jwt is not None:
+            params['token_reviewer_jwt'] = token_reviewer_jwt
+        if pem_keys is not None:
+            params['pem_keys'] = pem_keys
+
+        url = 'v1/auth/{0}/config'.format(mount_point)
+        return self._post(url, json=params)
+
+    async def get_kubernetes_configuration(self, mount_point='kubernetes'):
+        """
+        GET /auth/<mount_point>/config
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: dict, parsed JSON response from the config GET request
+        """
+
+        url = '/v1/auth/{0}/config'.format(mount_point)
+        return await (await self._get(url)).json()
+
+    def create_kubernetes_role(self, name, bound_service_account_names, bound_service_account_namespaces, ttl="",
+                               max_ttl="", period="", policies=None, mount_point='kubernetes'):
+        """
+        POST /auth/<mount_point>/role/:name
+        :param name: str, Name of the role.
+        :param bound_service_account_names: list, List of service account names able to access this role. If set to "*" all
+        names are allowed, both this and bound_service_account_namespaces can not be "*".
+        :param bound_service_account_namespaces: list, List of namespaces allowed to access this role. If set to "*" all
+        namespaces are allowed, both this and bound_service_account_names can not be set to "*".
+        :param ttl: str, The TTL period of tokens issued using this role in seconds.
+        :param max_ttl: str, The maximum allowed lifetime of tokens issued in seconds using this role.
+        :param period: str, If set, indicates that the token generated using this role should never expire.
+        The token should be renewed within the duration specified by this value. At each renewal, the token's TTL will
+        be set to the value of this parameter.
+        :param policies: list, Policies to be set on tokens issued using this role
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: requests.Response, will be an empty body with a 204 status code upon success
+        """
+        if bound_service_account_names == '*' and bound_service_account_namespaces == '*':
+            error_message = 'bound_service_account_names and bound_service_account_namespaces can not both be set to "*"'
+            raise exceptions.ParamValidationError(error_message)
+
+        params = {
+            'bound_service_account_names': bound_service_account_names,
+            'bound_service_account_namespaces': bound_service_account_namespaces,
+            'ttl': ttl,
+            'max_ttl': max_ttl,
+            'period': period,
+            'policies': policies,
+        }
+        url = 'v1/auth/{0}/role/{1}'.format(mount_point, name)
+        return self._post(url, json=params)
+
+    async def get_kubernetes_role(self, name, mount_point='kubernetes'):
+        """
+        GET /auth/<mount_point>/role/:name
+        :param name: str, Name of the role.
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: dict, parsed JSON response from the read role GET request
+        """
+
+        url = 'v1/auth/{0}/role/{1}'.format(mount_point, name)
+        return await (await self._get(url)).json()
+
+    async def list_kubernetes_roles(self, mount_point='kubernetes'):
+        """
+        GET /auth/<mount_point>/role?list=true
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: dict, parsed JSON response from the list roles GET request
+        """
+
+        url = 'v1/auth/{0}/role?list=true'.format(mount_point)
+        return await (await self._get(url)).json()
+
+    def delete_kubernetes_role(self, role, mount_point='kubernetes'):
+        """
+        DELETE /auth/<mount_point>/role/:role
+        :param role: str, Name of the role.
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: requests.Response, will be an empty body with a 204 status code upon success
+        """
+
+        url = 'v1/auth/{0}/role/{1}'.format(mount_point, role)
+        return self._delete(url)
+
+    def auth_kubernetes(self, role, jwt, use_token=True, mount_point='kubernetes'):
+        """
+        POST /auth/<mount_point>/login
+        :param role: str, Name of the role against which the login is being attempted.
+        :param jwt: str, Signed JSON Web Token (JWT) for authenticating a service account.
+        :param use_token: bool, if True, uses the token in the response received from the auth request to set the "token"
+         attribute on the current Client class instance.
+        :param mount_point: str, The "path" the k8s auth backend was mounted on. Vault currently defaults to "kubernetes".
+        :return: dict, parsed JSON response from the config POST request
+        """
+        params = {
+            'role': role,
+            'jwt': jwt
+        }
+        url = 'v1/auth/{0}/login'.format(mount_point)
+        return self.auth(url, json=params, use_token=use_token)
+
     def transit_create_key(self, name, convergent_encryption=None, derived=None, exportable=None,
                            key_type=None, mount_point='transit'):
         """
@@ -1484,8 +1606,16 @@ class AsyncClient(object):
     def _delete(self, url, **kwargs):
         return self.__request('delete', url, **kwargs)
 
+    def urljoin(self, *args):
+        """
+        Joins given arguments into a url. Trailing and leading slashes are
+        stripped for each argument.
+        """
+
+        return '/'.join(map(lambda x: str(x).strip('/'), args))
+
     async def __request(self, method, url, headers=None, **kwargs):
-        url = urljoin(self._url, url)
+        url = self.urljoin(self._url, url)
 
         if not headers:
             headers = {}
@@ -1502,7 +1632,7 @@ class AsyncClient(object):
             ssl=self._sslcontext,
             proxy=self._proxies, **kwargs)
         while response.status >= 300 and response.status < 400 and self.allow_redirects and 'Location' in response.headers:
-            url = urljoin(self._url, response.headers['Location'])
+            url = self.urljoin(self._url, response.headers['Location'])
             response = await self.session.request(
                 method, url, headers=headers,
                 allow_redirects=False,

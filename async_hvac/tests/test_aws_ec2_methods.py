@@ -65,6 +65,7 @@ class TestAwsEc2Methods(TestCase):
 
         # ensure we received our mock response data back successfully
         self.assertEqual(mock_response, actual_response)
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None),
@@ -101,6 +102,7 @@ class TestAwsEc2Methods(TestCase):
             first=expected_status_code,
             second=actual_response.status
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None),
@@ -141,6 +143,7 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None),
@@ -170,6 +173,7 @@ class TestAwsEc2Methods(TestCase):
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-cool-cert-1'),
@@ -206,6 +210,7 @@ class TestAwsEc2Methods(TestCase):
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-cool-cert-1'),
@@ -246,6 +251,7 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None),
@@ -284,6 +290,7 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-role-1'),
@@ -317,6 +324,7 @@ class TestAwsEc2Methods(TestCase):
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-role-1'),
@@ -365,6 +373,7 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-role-1'),
@@ -398,6 +407,7 @@ class TestAwsEc2Methods(TestCase):
             first=expected_status_code,
             second=actual_response.status,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None),
@@ -436,6 +446,7 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=actual_response,
         )
+        await client.close()
 
     @parameterized.expand([
         ("default mount point", None, 'my-role-1'),
@@ -476,3 +487,4 @@ class TestAwsEc2Methods(TestCase):
             first=mock_response,
             second=await actual_response.json(),
         )
+        await client.close()
