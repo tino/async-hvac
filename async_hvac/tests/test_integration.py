@@ -1268,6 +1268,34 @@ class IntegrationTest(asynctest.TestCase):
         self.client.token = self.root_token()
         await self.client.disable_auth_backend(mount_point=test_mount_point)
 
+    async def test_auth_gcp_alternate_mount_point_with_no_client_token_exception(self):
+        test_mount_point = 'gcp-custom-path'
+        # Turn on the gcp backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('gcp', mount_point=test_mount_point)
+
+        # Drop the client's token to replicate a typical end user's use of any auth method.
+        # I.e., its reasonable to expect the method is being called to _retrieve_ a token in the first place.
+        self.client.token = None
+
+        # Load a mock JWT stand in for a real document from GCP.
+        with open('test/example.jwt') as fp:
+            jwt = fp.read()
+
+        # When attempting to auth (POST) to an auth backend mounted at a different path than the default, we expect a
+        # generic 'missing client token' response from Vault.
+        with self.assertRaises(exceptions.InvalidRequest) as assertRaisesContext:
+            await self.client.auth_gcp('example-role', jwt)
+
+        expected_exception_message = 'missing client token'
+        actual_exception_message = str(assertRaisesContext.exception)
+        self.assertEqual(expected_exception_message, actual_exception_message)
+
+        # Reset test state.
+        self.client.token = self.root_token()
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
     async def test_tune_auth_backend(self):
         test_backend_type = 'approle'
         test_mount_point = 'tune-approle'
@@ -1315,3 +1343,250 @@ class IntegrationTest(asynctest.TestCase):
         self.assertDictEqual(secret_backends['test/']['options'], {'version': '2'})
 
         await self.client.disable_secret_backend('test')
+
+    async def test_create_kubernetes_configuration(self):
+        expected_status_code = 204
+        test_mount_point = 'k8s'
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            response = await self.client.create_kubernetes_configuration(
+                kubernetes_host='127.0.0.1:80',
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+        self.assertEqual(
+            first=expected_status_code,
+            second=response.status,
+        )
+
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_get_kubernetes_configuration(self):
+        test_host = '127.0.0.1:80'
+        test_mount_point = 'k8s'
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host=test_host,
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        # Test that we can retrieve the configuration
+        response = await self.client.get_kubernetes_configuration(
+            mount_point=test_mount_point
+        )
+        self.assertIn(
+            member='data',
+            container=response,
+        )
+        self.assertEqual(
+            first=test_host,
+            second=response['data'].get('kubernetes_host')
+        )
+
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_create_kubernetes_role(self):
+        test_role_name = 'test_role'
+        test_mount_point = 'k8s'
+        expected_status_code = 204
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host='127.0.0.1:80',
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        # Test that we can createa role
+        response = await self.client.create_kubernetes_role(
+            name=test_role_name,
+            bound_service_account_names='*',
+            bound_service_account_namespaces='vault_test',
+            mount_point=test_mount_point,
+        )
+        self.assertEqual(
+            first=expected_status_code,
+            second=response.status,
+        )
+
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_get_kubernetes_role(self):
+        test_role_name = 'test_role'
+        test_mount_point = 'k8s'
+        test_bound_service_account_namespaces = ['vault-test']
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host='127.0.0.1:80',
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        # Test that we can createa role
+        await self.client.create_kubernetes_role(
+            name=test_role_name,
+            bound_service_account_names='*',
+            bound_service_account_namespaces=test_bound_service_account_namespaces,
+            mount_point=test_mount_point,
+        )
+        response = await self.client.get_kubernetes_role(
+            name=test_role_name,
+            mount_point=test_mount_point,
+        )
+        self.assertIn(
+            member='data',
+            container=response,
+        )
+        self.assertEqual(
+            first=test_bound_service_account_namespaces,
+            second=response['data'].get('bound_service_account_namespaces')
+        )
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_list_kubernetes_roles(self):
+        test_role_name = 'test_role'
+        test_mount_point = 'k8s'
+        test_bound_service_account_namespaces = ['vault-test']
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host='127.0.0.1:80',
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        # Test that we can createa role
+        await self.client.create_kubernetes_role(
+            name=test_role_name,
+            bound_service_account_names='*',
+            bound_service_account_namespaces=test_bound_service_account_namespaces,
+            mount_point=test_mount_point,
+        )
+        response = await self.client.list_kubernetes_roles(
+            mount_point=test_mount_point,
+        )
+        self.assertIn(
+            member='data',
+            container=response,
+        )
+        self.assertEqual(
+            first=[test_role_name],
+            second=response['data'].get('keys')
+        )
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_delete_kubernetes_role(self):
+        test_role_name = 'test_role'
+        test_mount_point = 'k8s'
+        expected_status_code = 204
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host='127.0.0.1:80',
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        await self.client.create_kubernetes_role(
+            name=test_role_name,
+            bound_service_account_names='*',
+            bound_service_account_namespaces='vault_test',
+            mount_point=test_mount_point,
+        )
+        # Test that we can delete a role
+        response = await self.client.delete_kubernetes_role(
+            role=test_role_name,
+            mount_point=test_mount_point,
+        )
+        self.assertEqual(
+            first=expected_status_code,
+            second=response.status,
+        )
+
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)
+
+    async def test_auth_kubernetes(self):
+        test_role_name = 'test_role'
+        test_host = '127.0.0.1:80'
+        test_mount_point = 'k8s'
+
+        # Turn on the kubernetes backend with a custom mount_point path specified.
+        if '{0}/'.format(test_mount_point) in (await self.client.list_auth_backends()):
+            await self.client.disable_auth_backend(test_mount_point)
+        await self.client.enable_auth_backend('kubernetes', mount_point=test_mount_point)
+        with open('test/client-cert.pem') as fp:
+            certificate = fp.read()
+            await self.client.create_kubernetes_configuration(
+                kubernetes_host=test_host,
+                pem_keys=[certificate],
+                mount_point=test_mount_point,
+            )
+
+        await self.client.create_kubernetes_role(
+            name=test_role_name,
+            bound_service_account_names='*',
+            bound_service_account_namespaces='vault_test',
+            mount_point=test_mount_point,
+        )
+
+        # Test that we can authenticate
+        with open('test/example.jwt') as fp:
+            test_jwt = fp.read()
+            with self.assertRaises(exceptions.InternalServerError) as assertRaisesContext:
+                # we don't actually have a valid JWT to provide, so this method will throw an exception
+                await self.client.auth_kubernetes(
+                    role=test_role_name,
+                    jwt=test_jwt,
+                    mount_point=test_mount_point,
+                )
+
+        expected_exception_message = 'claim "iss" is invalid'
+        actual_exception_message = str(assertRaisesContext.exception)
+        self.assertEqual(expected_exception_message, actual_exception_message)
+
+        # Reset integration test state
+        await self.client.disable_auth_backend(mount_point=test_mount_point)

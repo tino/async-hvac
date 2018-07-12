@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 (July 12th, 2018)
+
+Merge changes of version 0.6.1 of hvac (Python 2/3 client for HashiCorp Vault), see https://github.com/ianunruh/hvac 
+* see https://github.com/ianunruh/hvac/releases for change logs.
+
 ## 0.6.0 (July 1, 2018)
 
 Merge changes of version 0.6.0 of hvac (Python 2/3 client for HashiCorp Vault), see https://github.com/ianunruh/hvac 

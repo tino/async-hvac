@@ -46,3 +46,4 @@ class TestAwsIamMethods(asynctest.TestCase):
 
         actual_role = actual_params['role']
         self.assertEqual('', actual_role)
+        await client.close()
