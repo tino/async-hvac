@@ -40,6 +40,15 @@ client = async_hvac.AsyncClient(url='https://localhost:8200',
 client = async_hvac.AsyncClient(url='https://localhost:8200', verify=False)
 ```
 
+Note that you will have to close the client with `client.close()` in order to
+avoid lingering open aiohttp.client.ClientSession's. An alternative is to open
+the client in a `with`-statement:
+
+```python
+async with async_hvac.AsyncClient(url='https://localhost:8200') as client:
+    print(await client.read('secret/foo'))
+```
+
 ### Read and write to secret backends
 
 ```python

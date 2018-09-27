@@ -4,16 +4,16 @@ import json
 import ssl
 from base64 import b64encode
 
+import aiohttp
+from async_hvac import aws_utils, exceptions
+
 try:
     import hcl
 
     has_hcl_parser = True
 except ImportError:
     has_hcl_parser = False
-import aiohttp
 
-from async_hvac import aws_utils
-from async_hvac import exceptions
 
 
 class AsyncClient(object):
@@ -36,6 +36,19 @@ class AsyncClient(object):
             self._sslcontext.load_cert_chain(self._cert[0], self._cert[1])
         else:
             self._sslcontext = False
+
+    def __enter__(self):
+        raise TypeError("Use async with instead")
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # __exit__ should exist in pair with __enter__ but never executed
+        pass  # pragma: no cover
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     @property
     def session(self):
