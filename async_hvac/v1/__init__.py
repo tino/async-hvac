@@ -15,7 +15,6 @@ except ImportError:
     has_hcl_parser = False
 
 
-
 class AsyncClient(object):
     def __init__(self, url='http://127.0.0.1:8200', token=None,
                  cert=None, verify=True, timeout=30, proxies=None,
